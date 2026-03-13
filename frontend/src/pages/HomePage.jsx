@@ -121,8 +121,8 @@ export default function HomePage() {
               >
                 <span className="text-2xl leading-none">≡</span>
               </button>
-
-              <div className="text-right mt-2">
+              
+              {/*<div className="text-right mt-2">
                 <Link
                   to="/login"
                   className="inline-flex items-center justify-center rounded-full bg-white px-6 py-2 text-sm font-bold text-slate-900 shadow-sm"
@@ -132,7 +132,8 @@ export default function HomePage() {
                 <div className="mt-2 text-xs text-white/70">
                   כניסת מנהל מערכת / הנהלת קמפוס
                 </div>
-              </div>
+              </div>*/}
+
             </div>
           </div>
 

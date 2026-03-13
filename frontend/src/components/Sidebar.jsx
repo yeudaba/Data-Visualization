@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 const menuItems = [
-  { label: "דף הבית", to: "/", Icon: Home },
+  { label: "דף הבית", to: "/home", Icon: Home },
   { label: "דוח 1 – השוואת נרשמים לפי חודשים / שנים", to: "/report1", Icon: TrendingUp },
   { label: "דוח 2 – ביקושי המחלקות של הנרשמים למכללה בהשוואה לשנים האחרונות", to: "/report2", Icon: BarChart3 },
   { label: "דוח 3 – שמות היישובים של הנרשמים לשנה״ל בחודש זה על פי המחלקה וקמפוס", to: "/report3", Icon: MapPinned },
@@ -26,13 +26,11 @@ export default function Sidebar({ isOpen, onToggle }) {
 
   return (
     <div className="fixed inset-0 z-50">
-      {/* overlay */}
       <div
         className="absolute inset-0 bg-black/60"
         onClick={onToggle}
       />
 
-      {/* drawer */}
       <div className="absolute right-0 top-0 h-full w-[340px] bg-[#0b1220] text-white shadow-2xl">
         <div className="p-6">
           <div className="flex items-start justify-between">

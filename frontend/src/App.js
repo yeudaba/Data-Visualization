@@ -11,8 +11,8 @@ import LoginPage from "./pages/LoginPage";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={<LoginPage />} />
+      <Route path="/home" element={<HomePage />} />
       <Route path="/report1" element={<Report1 />} />
       <Route path="/report2" element={<Report2 />} />
       <Route path="/report3" element={<Report3 />} />

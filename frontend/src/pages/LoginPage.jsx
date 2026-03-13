@@ -1,41 +1,64 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { User, Lock, Eye, EyeOff } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 
 export default function LoginPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // כרגע רק תצוגה ראשונית
-    // אחר כך אפשר לחבר לבדיקה אמיתית
-    console.log("Login attempt:", { username, password });
+    try {
+      const res = await fetch("http://localhost:10000/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username,
+          password,
+        }),
+      });
 
-    // דוגמה: אחרי כניסה מחזירים לדף הבית
-    // או לדף אזור אישי בהמשך
-    navigate("/");
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "התחברות נכשלה");
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      navigate("/home");
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("שגיאה בחיבור לשרת");
+    }
   };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#2e3038] text-white">
+    <div
+      dir="rtl"
+      className="min-h-screen bg-[#2e3038] text-white overflow-hidden relative"
+    >
       <Sidebar isOpen={menuOpen} onToggle={() => setMenuOpen((prev) => !prev)} />
 
-      <div className="mx-auto max-w-7xl px-6 pt-8 pb-14">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[18%] left-1/2 -translate-x-1/2 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
+        <div className="absolute bottom-[12%] left-[18%] h-40 w-40 rounded-full bg-indigo-400/10 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-7xl px-6 pt-6 pb-10">
         {/* Header */}
         <div className="grid grid-cols-3 items-start">
           <div className="justify-self-start">
-            <button
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              className="rounded-full p-3 text-white/90 hover:bg-white/10 -mt-2"
-              aria-label="פתיחת תפריט"
-            >
-              <span className="text-2xl leading-none">≡</span>
-            </button>
+            
           </div>
 
           <div className="justify-self-center text-center">
@@ -57,51 +80,84 @@ export default function LoginPage() {
           <div />
         </div>
 
-        {/* Title */}
-        <div className="mt-10 text-center">
-          <h1 className="text-4xl font-extrabold tracking-tight">כניסה למערכת</h1>
-          <p className="mt-3 text-white/70">
-            הזן שם משתמש וסיסמה כדי להיכנס לאזור האישי
-          </p>
-        </div>
+        {/* Main */}
+        <div className="mt-10 flex justify-center">
+          <div className="w-full max-w-md">
+            <div className="mb-8 text-center">
+              <h1 className="text-4xl font-extrabold tracking-tight">
+                כניסה למערכת
+              </h1>
+            </div>
 
-        {/* Login Box */}
-        <div className="mt-12 flex justify-center">
-          <div className="w-full max-w-md rounded-[28px] bg-[#3b3e47] p-8 shadow-[0_18px_55px_rgba(0,0,0,0.35)]">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-white/85">
-                  שם משתמש
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="הזן שם משתמש"
-                  className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white placeholder:text-white/40 ring-1 ring-white/10 outline-none transition focus:ring-2 focus:ring-sky-400"
-                />
+            <div className="rounded-[30px] bg-[#434754]/95 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] ring-1 ring-white/10 backdrop-blur-sm">
+              <div className="mb-8 text-center">
+                <h2 className="text-2xl font-extrabold">ברוכים הבאים</h2>
+                <p className="mt-2 text-sm text-white/55">מערכת מדור רישום</p>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-white/85">
-                  סיסמה
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="הזן סיסמה"
-                  className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white placeholder:text-white/40 ring-1 ring-white/10 outline-none transition focus:ring-2 focus:ring-sky-400"
-                />
-              </div>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-white/90">
+                    שם משתמש
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="הזן שם משתמש"
+                      className="w-full rounded-2xl bg-white/10 px-5 py-4 pr-12 text-white placeholder:text-white/35 outline-none ring-white/8 transition focus:ring-2 focus:ring-white/20"
+                    />
+                    <User className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/45" />
+                  </div>
+                </div>
 
-              <button
-                type="submit"
-                className="w-full rounded-2xl bg-white px-4 py-3 text-lg font-bold text-[#2e3038] transition hover:bg-slate-200"
-              >
-                כניסה
-              </button>
-            </form>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-white/90">
+                    סיסמה
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="הזן סיסמה"
+                      className="w-full rounded-2xl bg-white/10 px-5 py-4 pr-12 pl-12 text-white placeholder:text-white/35 outline-none ring-white/8 transition focus:ring-2 focus:ring-white/20"
+                    />
+                    <Lock className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/45" />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-white/45 hover:text-white/80"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full rounded-2xl px-4 py-4 text-lg font-bold text-white transition-all duration-300
+                  bg-gradient-to-l from-[#5a6072] via-[#4f5567] to-[#444958]
+                  shadow-[0_10px_30px_rgba(0,0,0,0.22)]
+                  ring-1 ring-white/10
+                  hover:from-[#6b7287] hover:via-[#596077] hover:to-[#4d5366]
+                  hover:shadow-[0_16px_38px_rgba(0,0,0,0.30)]
+                  hover:-translate-y-[1px]
+                  active:translate-y-0"
+                >
+                  כניסה לאזור האישי
+                </button>
+              </form>
+
+              <div className="mt-6 text-center text-sm text-white/35">
+                SCE Management System
+              </div>
+            </div>
           </div>
         </div>
       </div>
