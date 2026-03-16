@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -10,6 +10,9 @@ import {
   CartesianGrid,
 } from "recharts";
 import Sidebar from "../components/Sidebar";
+
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || "http://localhost:10000";
 
 const departments = [
   "הנדסת תוכנה",
@@ -73,7 +76,6 @@ function MiniIcon({ children, className = "", size = "h-4 w-4" }) {
   );
 }
 
-/**  אייקון לכותרת הראשית (מיושר לקו הכותרת) */
 function IcoTitle() {
   return (
     <MiniIcon
@@ -96,7 +98,6 @@ function IcoTitle() {
   );
 }
 
-/** אייקון לטבלה */
 function IcoTable() {
   return (
     <MiniIcon className="text-white/55">
@@ -108,7 +109,6 @@ function IcoTable() {
   );
 }
 
-/** אייקון לגרף */
 function IcoChart() {
   return (
     <MiniIcon className="text-white/55">
@@ -122,7 +122,6 @@ function IcoChart() {
   );
 }
 
-/** משולשים לעליה/ירידה בעמודת שינוי */
 function TrendArrow({ dir }) {
   if (dir === "neutral") return null;
 
@@ -140,7 +139,7 @@ function TrendArrow({ dir }) {
 }
 
 /* =========================
-   ✅ UI helpers
+   UI helpers
    ========================= */
 function buildTableHeader(year, monthsLabel) {
   return (
@@ -181,7 +180,6 @@ function CustomTooltip({ active, payload, label, yearA, yearB, monthsLabel }) {
   );
 }
 
-/**  Legend נקי */
 function CustomLegend({ payload }) {
   if (!payload?.length) return null;
 
@@ -200,7 +198,6 @@ function CustomLegend({ payload }) {
   );
 }
 
-/**  Tick לשתי שורות */
 function CustomXAxisTick({ x, y, payload }) {
   const text = payload?.value ?? "";
   const words = String(text).split(" ");
@@ -246,6 +243,20 @@ function CustomCursor({ x, y, width, height }) {
   );
 }
 
+function buildMockChartData({ yearA, yearB, selectedMonths }) {
+  const useAll = selectedMonths.includes("ALL");
+  const monthFactor = useAll ? 12 : selectedMonths.length;
+
+  return departments.map((dep, idx) => {
+    const seedA = idx * 100 + yearA.length * 17 + monthFactor * 3;
+    const seedB = idx * 100 + yearB.length * 19 + monthFactor * 5;
+
+    const baseA = genRandomValue(seedA, 80, 450) * monthFactor;
+    const baseB = Math.max(0, baseA + genRandomValue(seedB, -120, 160));
+    return { department: dep, yearA: baseA, yearB: baseB };
+  });
+}
+
 export default function Report2() {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -253,20 +264,66 @@ export default function Report2() {
   const [yearB, setYearB] = useState("תשפ״ה");
   const [selectedMonths, setSelectedMonths] = useState(["ALL"]);
 
+  const [chartData, setChartData] = useState([]);
+  const [apiMode, setApiMode] = useState("mock");
+  const [loading, setLoading] = useState(false);
+
   const monthsLabel = useMemo(() => getMonthsLabel(selectedMonths), [selectedMonths]);
 
-  const chartData = useMemo(() => {
-    const useAll = selectedMonths.includes("ALL");
-    const monthFactor = useAll ? 12 : selectedMonths.length;
+  useEffect(() => {
+    let cancelled = false;
 
-    return departments.map((dep, idx) => {
-      const seedA = idx * 100 + yearA.length * 17 + monthFactor * 3;
-      const seedB = idx * 100 + yearB.length * 19 + monthFactor * 5;
+    async function loadData() {
+      setLoading(true);
 
-      const baseA = genRandomValue(seedA, 80, 450) * monthFactor;
-      const baseB = Math.max(0, baseA + genRandomValue(seedB, -120, 160));
-      return { department: dep, yearA: baseA, yearB: baseB };
-    });
+      try {
+        const monthsParam = selectedMonths.includes("ALL")
+          ? "ALL"
+          : [...selectedMonths].sort((a, b) => Number(a) - Number(b)).join(",");
+
+        const params = new URLSearchParams({
+          yearA,
+          yearB,
+          months: monthsParam,
+        });
+
+        const res = await fetch(
+          `${API_BASE_URL}/api/report2/comparison?${params.toString()}`
+        );
+
+        if (!res.ok) {
+          throw new Error("API not ready");
+        }
+
+        const json = await res.json();
+
+        if (!json?.rows || !Array.isArray(json.rows)) {
+          throw new Error("Bad API shape");
+        }
+
+        if (!cancelled) {
+          setChartData(json.rows);
+          setApiMode("api");
+        }
+      } catch (error) {
+        const mock = buildMockChartData({ yearA, yearB, selectedMonths });
+
+        if (!cancelled) {
+          setChartData(mock);
+          setApiMode("mock");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [yearA, yearB, selectedMonths]);
 
   const tableRows = useMemo(() => {
@@ -299,7 +356,6 @@ export default function Report2() {
       <Sidebar isOpen={menuOpen} onToggle={() => setMenuOpen((s) => !s)} />
 
       <div className="mx-auto max-w-6xl px-6 pt-8 pb-14">
-        {/* TOP BAR */}
         <div className="grid grid-cols-3 items-start">
           <div className="justify-self-start">
             <button
@@ -329,20 +385,20 @@ export default function Report2() {
           <div />
         </div>
 
-        {/*  כותרת ראשית: יישור מושלם לאותו קו */}
         <div className="mt-6 text-center">
           <div className="inline-flex items-center justify-center gap-3 align-middle">
-            <IcoTitle /> 
-            <h1 className="text-3xl font-extrabold tracking-tight leading-none"> 
+            <IcoTitle />
+            <h1 className="text-3xl font-extrabold tracking-tight leading-none">
               דוח 2 - ביקושי המחלקות של הנרשמים למכללה בהשוואה לשנים האחרונות
             </h1>
-            
           </div>
 
           <p className="mt-2 text-sm text-white/75">
             השוואה: <span className="font-semibold">{yearB}</span> מול{" "}
             <span className="font-semibold">{yearA}</span> | חודשים:{" "}
             <span className="font-semibold">{monthsLabel}</span>
+            <span className="mx-2 font-semibold">{apiMode === "api" ? "API" : "MOCK"}</span>
+            {loading ? <span className="mr-2">(טוען...)</span> : null}
           </p>
         </div>
 
@@ -394,7 +450,6 @@ export default function Report2() {
         </div>
 
         <div className="mt-8 flex flex-col gap-6 lg:flex-row-reverse">
-          {/* table */}
           <div className="w-full lg:w-[40%]">
             <div className="rounded-[28px] bg-[#3b3e47] p-6 shadow-[0_18px_55px_rgba(0,0,0,0.35)]">
               <div className="mb-4 flex items-center gap-2">
@@ -457,7 +512,6 @@ export default function Report2() {
             </div>
           </div>
 
-          {/* chart */}
           <div className="w-full lg:w-[60%]">
             <div className="rounded-[28px] bg-[#3b3e47] p-6 shadow-[0_18px_55px_rgba(0,0,0,0.35)]">
               <div className="mb-4 flex items-center gap-2">

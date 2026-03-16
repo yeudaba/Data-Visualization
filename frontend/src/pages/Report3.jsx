@@ -12,6 +12,10 @@ import {
 import Sidebar from "../components/Sidebar";
 import ResidenceMap from "../components/ResidenceMap";
 
+// ----- API -----
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || "http://localhost:10000";
+
 // ----- Options -----
 const campuses = [
   { key: "ALL", label: "כל הקמפוסים" },
@@ -44,17 +48,17 @@ const townToArea = {
   "קריית גת": "SOUTH",
   "קריית מלאכי": "SOUTH",
 
-  "יבנה": "CENTER",
+  יבנה: "CENTER",
   "גן יבנה": "CENTER",
-  "רחובות": "CENTER",
+  רחובות: "CENTER",
   "ראשון לציון": "CENTER",
   "נס ציונה": "CENTER",
-  "חולון": "CENTER",
+  חולון: "CENTER",
   "בת ים": "CENTER",
-  "רמלה": "CENTER",
-  "לוד": "CENTER",
+  רמלה: "CENTER",
+  לוד: "CENTER",
   "תל אביב": "CENTER",
-  "נהריה": "NORTH",
+  נהריה: "NORTH",
 };
 
 const fmtInt = (n) => new Intl.NumberFormat("he-IL").format(n);
@@ -195,7 +199,10 @@ function CustomXAxisTick({ x, y, payload }) {
   const text = payload?.value ?? "";
   const words = String(text).split(" ");
   const mid = Math.ceil(words.length / 2);
-  const lines = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")].filter(Boolean);
+  const lines = [
+    words.slice(0, mid).join(" "),
+    words.slice(mid).join(" "),
+  ].filter(Boolean);
 
   return (
     <g transform={`translate(${x},${y})`}>
@@ -271,7 +278,10 @@ export default function Report3() {
         params.set("department", department);
         params.set("area", area);
 
-        const res = await fetch(`/api/report3?${params.toString()}`);
+        const res = await fetch(
+          `${API_BASE_URL}/api/stats/cities?${params.toString()}`
+        );
+
         if (!res.ok) throw new Error("API not ready");
 
         const json = await res.json();
@@ -305,7 +315,7 @@ export default function Report3() {
   const filteredData = useMemo(() => {
     return area === "ALL"
       ? data
-      : data.filter((row) => townToArea[row.town] === area);
+      : data.filter((row) => (row.region || townToArea[row.town]) === area);
   }, [data, area]);
 
   const visibleRows = useMemo(() => {
@@ -329,10 +339,8 @@ export default function Report3() {
 
   const campusLabel =
     campuses.find((c) => c.key === campus)?.label ?? "כל הקמפוסים";
-  const areaLabel =
-    areas.find((a) => a.key === area)?.label ?? "בחר הכל";
-  const departmentLabel =
-    department === "ALL" ? "כל המחלקות" : department;
+  const areaLabel = areas.find((a) => a.key === area)?.label ?? "בחר הכל";
+  const departmentLabel = department === "ALL" ? "כל המחלקות" : department;
 
   const primarySeriesLabel = `נרשמים • ${campusLabel} • ${departmentLabel} • ${areaLabel}`;
 
@@ -459,9 +467,7 @@ export default function Report3() {
                 <div className="text-lg font-bold">נרשמים לפי עיר</div>
               </div>
 
-              <div className="text-xs text-white/60">
-                גרף עם סדרה אחת
-              </div>
+              <div className="text-xs text-white/60">גרף עם סדרה אחת</div>
             </div>
 
             <div className="rounded-[24px] bg-[#2f3340] px-4 pt-5 pb-4 ring-1 ring-white/10">
@@ -506,10 +512,7 @@ export default function Report3() {
                     axisLine={false}
                   />
 
-                  <Tooltip
-                    content={<SimpleCityTooltip />}
-                    cursor={false}
-                  />
+                  <Tooltip content={<SimpleCityTooltip />} cursor={false} />
 
                   <Bar
                     dataKey="selectedValue"

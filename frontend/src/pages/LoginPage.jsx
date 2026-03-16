@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || "http://localhost:10000";
+
 export default function LoginPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [username, setUsername] = useState("");
@@ -14,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
 
     try {
-      const res = await fetch("http://localhost:10000/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -55,11 +58,8 @@ export default function LoginPage() {
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-6 pt-6 pb-10">
-        {/* Header */}
         <div className="grid grid-cols-3 items-start">
-          <div className="justify-self-start">
-            
-          </div>
+          <div className="justify-self-start"></div>
 
           <div className="justify-self-center text-center">
             <div className="mx-auto inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 shadow-sm ring-1 ring-black/10">
@@ -80,7 +80,6 @@ export default function LoginPage() {
           <div />
         </div>
 
-        {/* Main */}
         <div className="mt-10 flex justify-center">
           <div className="w-full max-w-md">
             <div className="mb-8 text-center">

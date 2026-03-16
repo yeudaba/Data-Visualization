@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  idNumber   String    @id @map("id_number") @db.VarChar(20)
+  username   String    @unique @db.VarChar(100)
+  fullName   String    @map("full_name") @db.VarChar(150)
+  email      String    @unique @db.VarChar(150)
+  role       String    @db.VarChar(50)
+  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+
+  password   Password?
+
+  @@map("users")
+}
+
+model Password {
+  idNumber     String    @id @map("id_number") @db.VarChar(20)
+  passwordHash String    @map("password_hash")
+  updatedAt    DateTime? @default(now()) @map("updated_at") @db.Timestamp(6)
+
+  user         User      @relation(fields: [idNumber], references: [idNumber], onDelete: Cascade)
+
+  @@map("passwords")
+}
+
+model Department {
+  id     Int    @id @default(autoincrement())
+  name   String @unique
+  leads  Lead[]
+
+  @@map("departments")
+}
+
+model City {
+  id      Int    @id @default(autoincrement())
+  town    String @unique
+  region  String
+  leads   Lead[]
+
+  @@map("cities")
+}
+
+model Lead {
+  id             Int             @id @default(autoincrement())
+  fullName       String          @map("full_name")
+  phone          String?
+  email          String?
+  campus         String
+  area           String
+  status         String?
+  source         String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  departmentId   Int             @map("department_id")
+  cityId         Int             @map("city_id")
+
+  department     Department      @relation(fields: [departmentId], references: [id])
+  city           City            @relation(fields: [cityId], references: [id])
+  consultations  Consultation[]
+
+  @@map("leads")
+}
+
+model Consultation {
+  id          Int       @id @default(autoincrement())
+  leadId      Int       @map("lead_id")
+  meetingDate DateTime? @map("meeting_date")
+  outcome     String?
+  arrived     Boolean?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("consultations")
+}

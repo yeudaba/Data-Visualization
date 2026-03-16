@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -9,15 +9,8 @@ import {
 } from "react-icons/hi2";
 import KpiCard from "../components/KpiCard";
 import Sidebar from "../components/Sidebar";
+import { getHomeSummary } from "../api/metricsApi";
 
-function seededRand(seed) {
-  let x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
-function randInt(seed, min, max) {
-  const r = seededRand(seed);
-  return Math.floor(min + r * (max - min + 1));
-}
 function trendFromDelta(deltaPct) {
   if (deltaPct > 0) return { type: "up", text: `+${deltaPct}% לעומת חודש קודם` };
   if (deltaPct < 0) return { type: "down", text: `${deltaPct}% לעומת חודש קודם` };
@@ -49,48 +42,151 @@ function GroupCard({ title, icon: Icon, iconClassName = "", items }) {
 
 export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSummary() {
+      try {
+        setLoading(true);
+        const data = await getHomeSummary();
+
+        if (!cancelled) {
+          setSummary(data);
+        }
+      } catch (error) {
+        console.error("Failed to load home summary:", error);
+
+        if (!cancelled) {
+          setSummary({
+            totalLeads: 0,
+            totalMeetings: 0,
+            totalSales: 0,
+            leadsInProgress: 0,
+            closedLeads: 0,
+            newSales: 0,
+            refunds: 0,
+            conversionRate: 0,
+            todayMeetings: 0,
+            futureMeetings: 0,
+            canceledMeetings: 0,
+            trends: {
+              totalLeads: 0,
+              newLeads: 0,
+              leadsInProgress: 0,
+              closedLeads: 0,
+              totalSales: 0,
+              newSales: 0,
+              refunds: 0,
+              conversionRate: 0,
+              totalMeetings: 0,
+              todayMeetings: 0,
+              futureMeetings: 0,
+              canceledMeetings: 0,
+            },
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const data = useMemo(() => {
-    const seedBase = 42;
-
-    const totalKids = randInt(seedBase + 1, 80, 220);
-    const newKids = randInt(seedBase + 2, 20, 120);
-    const treatedKids = randInt(seedBase + 3, 10, 80);
-    const closedKids = randInt(seedBase + 4, 10, 80);
-
-    const totalSales = randInt(seedBase + 5, 8, 40);
-    const newSales = randInt(seedBase + 6, 3, 20);
-    const refunds = randInt(seedBase + 7, 0, 10);
-    const conversion = randInt(seedBase + 8, 10, 35);
-
-    const totalMeetings = randInt(seedBase + 9, 20, 80);
-    const todayMeetings = randInt(seedBase + 10, 0, 15);
-    const futureMeetings = randInt(seedBase + 11, 0, 20);
-    const canceledMeetings = randInt(seedBase + 12, 0, 10);
-
-    const d = Array.from({ length: 12 }, (_, i) => randInt(seedBase + 20 + i, -12, 12));
+    const s = summary || {
+      totalLeads: 0,
+      totalMeetings: 0,
+      totalSales: 0,
+      leadsInProgress: 0,
+      closedLeads: 0,
+      newSales: 0,
+      refunds: 0,
+      conversionRate: 0,
+      todayMeetings: 0,
+      futureMeetings: 0,
+      canceledMeetings: 0,
+      trends: {},
+    };
 
     return {
       kids: [
-        { title: 'סה"כ לידים', value: totalKids, trend: trendFromDelta(d[0]) },
-        { title: "לידים חדשים החודש", value: newKids, trend: trendFromDelta(d[1]) },
-        { title: "לידים בטיפול", value: treatedKids, trend: trendFromDelta(d[2]) },
-        { title: "לידים סגורים", value: closedKids, trend: trendFromDelta(d[3]) },
+        {
+          title: 'סה"כ לידים',
+          value: s.totalLeads ?? 0,
+          trend: trendFromDelta(s.trends?.totalLeads ?? 0),
+        },
+        {
+          title: "לידים חדשים החודש",
+          value: s.newLeads ?? 0,
+          trend: trendFromDelta(s.trends?.newLeads ?? 0),
+        },
+        {
+          title: "לידים בטיפול",
+          value: s.leadsInProgress ?? 0,
+          trend: trendFromDelta(s.trends?.leadsInProgress ?? 0),
+        },
+        {
+          title: "לידים סגורים",
+          value: s.closedLeads ?? 0,
+          trend: trendFromDelta(s.trends?.closedLeads ?? 0),
+        },
       ],
       sales: [
-        { title: 'סה"כ מכירות', value: totalSales, trend: trendFromDelta(d[4]) },
-        { title: "מכירות חדשות", value: newSales, trend: trendFromDelta(d[5]) },
-        { title: "החזרים", value: refunds, trend: trendFromDelta(d[6]) },
-        { title: "אחוז המרה", value: `${conversion}%`, trend: trendFromDelta(d[7]) },
+        {
+          title: 'סה"כ מכירות',
+          value: s.totalSales ?? 0,
+          trend: trendFromDelta(s.trends?.totalSales ?? 0),
+        },
+        {
+          title: "מכירות חדשות",
+          value: s.newSales ?? 0,
+          trend: trendFromDelta(s.trends?.newSales ?? 0),
+        },
+        {
+          title: "החזרים",
+          value: s.refunds ?? 0,
+          trend: trendFromDelta(s.trends?.refunds ?? 0),
+        },
+        {
+          title: "אחוז המרה",
+          value: `${s.conversionRate ?? 0}%`,
+          trend: trendFromDelta(s.trends?.conversionRate ?? 0),
+        },
       ],
       meetings: [
-        { title: 'סה"כ פגישות', value: totalMeetings, trend: trendFromDelta(d[8]) },
-        { title: "פגישות היום", value: todayMeetings, trend: trendFromDelta(d[9]) },
-        { title: "פגישות עתידיות", value: futureMeetings, trend: trendFromDelta(d[10]) },
-        { title: "פגישות שבוטלו", value: canceledMeetings, trend: trendFromDelta(d[11]) },
+        {
+          title: 'סה"כ פגישות',
+          value: s.totalMeetings ?? 0,
+          trend: trendFromDelta(s.trends?.totalMeetings ?? 0),
+        },
+        {
+          title: "פגישות היום",
+          value: s.todayMeetings ?? 0,
+          trend: trendFromDelta(s.trends?.todayMeetings ?? 0),
+        },
+        {
+          title: "פגישות עתידיות",
+          value: s.futureMeetings ?? 0,
+          trend: trendFromDelta(s.trends?.futureMeetings ?? 0),
+        },
+        {
+          title: "פגישות שבוטלו",
+          value: s.canceledMeetings ?? 0,
+          trend: trendFromDelta(s.trends?.canceledMeetings ?? 0),
+        },
       ],
     };
-  }, []);
+  }, [summary]);
 
   const updatedAt = useMemo(() => {
     const now = new Date();
@@ -101,16 +197,14 @@ export default function HomePage() {
     });
     const date = now.toLocaleDateString("he-IL");
     return `${time}, ${date}`;
-  }, []);
+  }, [summary]);
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#2e3038] text-white">
       <Sidebar isOpen={menuOpen} onToggle={() => setMenuOpen((s) => !s)} />
 
       <div className="mx-auto max-w-6xl px-6 pt-8">
-        {/* TOP BAR */}
         <div className="grid grid-cols-3 items-start">
-          {/* Left: burger + personal area together */}
           <div className="justify-self-start">
             <div className="flex items-start gap-3">
               <button
@@ -121,7 +215,7 @@ export default function HomePage() {
               >
                 <span className="text-2xl leading-none">≡</span>
               </button>
-              
+
               {/*<div className="text-right mt-2">
                 <Link
                   to="/login"
@@ -133,11 +227,9 @@ export default function HomePage() {
                   כניסת מנהל מערכת / הנהלת קמפוס
                 </div>
               </div>*/}
-
             </div>
           </div>
 
-          {/* Center: logo with WHITE background */}
           <div className="justify-self-center text-center">
             <div className="mx-auto inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 shadow-sm ring-1 ring-black/10">
               <img
@@ -152,11 +244,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right: empty for symmetry */}
           <div className="justify-self-end" />
         </div>
 
-        {/* Title with icon */}
         <div className="mt-8 text-center">
           <h1 className="flex items-center justify-center gap-3 text-3xl font-extrabold tracking-tight">
             <HiOutlineChartBar className="text-4xl text-sky-300" />
@@ -164,10 +254,10 @@ export default function HomePage() {
           </h1>
           <p className="mt-2 text-sm text-white/75">
             תצוגה מרוכזת של לידים, פגישות ומכירות – בזמן כמעט אמת.
+            {loading ? <span className="mr-2">(טוען...)</span> : null}
           </p>
         </div>
 
-        {/* 3 group cards + icons */}
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
           <GroupCard
             title="לידים"

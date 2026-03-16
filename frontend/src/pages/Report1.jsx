@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -10,6 +10,9 @@ import {
   CartesianGrid,
 } from "recharts";
 import Sidebar from "../components/Sidebar";
+
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || "http://localhost:10000";
 
 const months = [
   { key: "ALL", label: "בחר הכל" },
@@ -47,7 +50,6 @@ function getMonthsLabel(selectedMonths) {
   return selectedMonths.map((k) => map.get(k)).join(", ");
 }
 
-// מייצר ערכי רישום חודשיים (לא מצטבר) לשנה מסוימת ואז נחבר מצטבר
 function generateMonthlySeries(yearKey) {
   const yearSeed = [...String(yearKey)].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
 
@@ -60,7 +62,7 @@ function generateMonthlySeries(yearKey) {
   return arr;
 }
 
-function buildCumulativeData({ yearA, yearB, selectedMonths }) {
+function buildMockCumulativeData({ yearA, yearB, selectedMonths }) {
   const useAll = selectedMonths.includes("ALL");
 
   const chosenMonthKeys = useAll
@@ -120,7 +122,6 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-/** ✅ Legend עם אייקון + נקודה צבעונית */
 function CustomLegend({ payload }) {
   if (!payload?.length) return null;
 
@@ -128,7 +129,6 @@ function CustomLegend({ payload }) {
     <div className="flex flex-wrap items-center justify-center gap-4 pt-2 text-sm text-white/85">
       {payload.map((entry) => (
         <div key={entry.value} className="flex items-center gap-2">
-          
           <span
             className="inline-block h-2.5 w-2.5 rounded-full"
             style={{ background: entry.color }}
@@ -140,7 +140,6 @@ function CustomLegend({ payload }) {
   );
 }
 
-
 export default function Report1() {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -148,10 +147,66 @@ export default function Report1() {
   const [yearB, setYearB] = useState("תשפ״ה");
   const [selectedMonths, setSelectedMonths] = useState(["ALL"]);
 
+  const [chartData, setChartData] = useState([]);
+  const [apiMode, setApiMode] = useState("mock");
+  const [loading, setLoading] = useState(false);
+
   const monthsLabel = useMemo(() => getMonthsLabel(selectedMonths), [selectedMonths]);
 
-  const chartData = useMemo(() => {
-    return buildCumulativeData({ yearA, yearB, selectedMonths });
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadData() {
+      setLoading(true);
+
+      try {
+        const monthsParam = selectedMonths.includes("ALL")
+          ? "ALL"
+          : [...selectedMonths].sort((a, b) => Number(a) - Number(b)).join(",");
+
+        const params = new URLSearchParams({
+          yearA,
+          yearB,
+          months: monthsParam,
+        });
+
+        const res = await fetch(
+          `${API_BASE_URL}/api/report1/comparison?${params.toString()}`
+        );
+
+        if (!res.ok) {
+          throw new Error("API not ready");
+        }
+
+        const json = await res.json();
+
+        if (!json?.rows || !Array.isArray(json.rows)) {
+          throw new Error("Bad API shape");
+        }
+
+        if (!cancelled) {
+          setChartData(json.rows);
+          setApiMode("api");
+        }
+      } catch (error) {
+        const mock = buildMockCumulativeData({ yearA, yearB, selectedMonths });
+
+        if (!cancelled) {
+          setChartData(mock);
+          setApiMode("mock");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [yearA, yearB, selectedMonths]);
 
   const tableRows = useMemo(() => {
@@ -188,7 +243,6 @@ export default function Report1() {
       <Sidebar isOpen={menuOpen} onToggle={() => setMenuOpen((s) => !s)} />
 
       <div className="mx-auto max-w-6xl px-6 pt-8 pb-14">
-        {/* TOP BAR (כמו HomePage, בלי אזור אישי) */}
         <div className="grid grid-cols-3 items-start">
           <div className="justify-self-start">
             <button
@@ -218,7 +272,6 @@ export default function Report1() {
           <div />
         </div>
 
-        {/* title */}
         <div className="mt-6 text-center">
           <h1 className="text-3xl font-extrabold tracking-tight">
             📈 דוח 1 - השוואת נרשמים לפי חודשים / שנים
@@ -227,10 +280,11 @@ export default function Report1() {
             השוואה: <span className="font-semibold">{yearB}</span> מול{" "}
             <span className="font-semibold">{yearA}</span> | חודשים:{" "}
             <span className="font-semibold">{monthsLabel}</span>
+            <span className="mx-2 font-semibold">{apiMode === "api" ? "API" : "MOCK"}</span>
+            {loading ? <span className="mr-2">(טוען...)</span> : null}
           </p>
         </div>
 
-        {/* controls */}
         <div className="mt-6 flex flex-col items-center justify-between gap-4 lg:flex-row">
           <div className="flex items-center gap-3">
             <div className="text-sm text-white/80">שנה</div>
@@ -256,7 +310,6 @@ export default function Report1() {
             </select>
           </div>
 
-          {/* months chips */}
           <div className="flex flex-wrap justify-center gap-2">
             {months.map((m) => {
               const active = selectedMonths.includes(m.key);
@@ -279,9 +332,7 @@ export default function Report1() {
           </div>
         </div>
 
-        {/* layout: table RIGHT, chart LEFT */}
         <div className="mt-8 flex flex-col gap-6 lg:flex-row-reverse">
-          {/* table (right) */}
           <div className="w-full lg:w-[40%]">
             <div className="rounded-[28px] bg-[#3b3e47] p-6 shadow-[0_18px_55px_rgba(0,0,0,0.35)]">
               <div className="mb-4 text-lg font-bold">📋 סיכום חודשי מצטבר (השוואה)</div>
@@ -334,7 +385,6 @@ export default function Report1() {
             </div>
           </div>
 
-          {/* chart (left) */}
           <div className="w-full lg:w-[60%]">
             <div className="rounded-[28px] bg-[#3b3e47] p-6 shadow-[0_18px_55px_rgba(0,0,0,0.35)]">
               <div className="mb-4 text-lg font-bold">📉 נרשמים מצטברים לפי חודשים</div>
@@ -359,11 +409,8 @@ export default function Report1() {
                     />
 
                     <Tooltip content={<CustomTooltip />} />
-
-                    {/* ✅ Legend עם אייקונים */}
                     <Legend content={<CustomLegend />} />
 
-                    {/* שנה נבחרת */}
                     <Line
                       type="monotone"
                       dataKey="yearB"
@@ -374,7 +421,6 @@ export default function Report1() {
                       activeDot={{ r: 6 }}
                     />
 
-                    {/* שנה להשוואה */}
                     <Line
                       type="monotone"
                       dataKey="yearA"

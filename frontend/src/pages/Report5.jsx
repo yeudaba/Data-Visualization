@@ -1,7 +1,16 @@
-// src/pages/Report5.jsx
-import React, { useMemo, useState } from "react";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+} from "recharts";
 import Sidebar from "../components/Sidebar";
+
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || "http://localhost:10000";
 
 /** ---------- Options ---------- */
 const campusOptions = [
@@ -19,6 +28,7 @@ function seededRand(seed) {
   let x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
 }
+
 function genRandomValue(seed, min, max) {
   const r = seededRand(seed);
   return Math.floor(min + r * (max - min + 1));
@@ -37,21 +47,22 @@ const mediaSources = [
 ];
 
 function buildMockByMedia({ year, campus }) {
-  const campusFactor = campus === "ALL" ? 1.0 : campus === "ASHDOD" ? 1.08 : 0.96;
+  const campusFactor =
+    campus === "ALL" ? 1.0 : campus === "ASHDOD" ? 1.08 : 0.96;
 
   return mediaSources.map((m, idx) => {
     const seed = idx * 91 + year.length * 37 + campus.length * 53;
 
     const gross = Math.round(genRandomValue(seed + 11, 120, 520) * campusFactor);
 
-    const qRate = 0.38 + seededRand(seed + 77) * 0.28; // ~38% עד ~66%
+    const qRate = 0.38 + seededRand(seed + 77) * 0.28;
     const qualified = Math.max(0, Math.round(gross * qRate));
 
     return { name: m.key, gross, qualified, color: m.color };
   });
 }
 
-/** ---------- Icons (עדינים) ---------- */
+/** ---------- Icons ---------- */
 function MiniIcon({ children, className = "", size = "h-5 w-5" }) {
   return (
     <svg viewBox="0 0 24 24" className={`${size} ${className}`} fill="none" aria-hidden="true">
@@ -60,7 +71,6 @@ function MiniIcon({ children, className = "", size = "h-5 w-5" }) {
   );
 }
 
-/**  אייקון "דוח/מסמך" לכותרת (במקום רמקול) */
 function IcoTitle() {
   return (
     <MiniIcon size="h-5 w-5" className="text-white/60">
@@ -124,10 +134,10 @@ function CustomTooltip({ active, payload }) {
   );
 }
 
-/** ---------- Label בתוך ה-Pie (אחוזים על כל פלח) ---------- */
 function renderPieLabel({ x, y, percent }) {
   const p = Math.round((percent ?? 0) * 100);
   if (p <= 0) return null;
+
   return (
     <text
       x={x}
@@ -144,7 +154,6 @@ function renderPieLabel({ x, y, percent }) {
   );
 }
 
-/** ✅ Legend נקי כמו שהיה: נקודה צבעונית + טקסט רגיל */
 function CustomLegend({ payload }) {
   if (!payload?.length) return null;
 
@@ -166,13 +175,74 @@ function CustomLegend({ payload }) {
 /** ---------- Component ---------- */
 export default function Report5() {
   const [menuOpen, setMenuOpen] = useState(false);
-
   const [campus, setCampus] = useState("ALL");
   const [year, setYear] = useState("תשפ״ה");
 
-  const campusLabel = campusOptions.find((c) => c.key === campus)?.label ?? "כל הקמפוסים";
+  const [raw, setRaw] = useState([]);
+  const [apiMode, setApiMode] = useState("mock");
+  const [loading, setLoading] = useState(false);
 
-  const raw = useMemo(() => buildMockByMedia({ year, campus }), [year, campus]);
+  const campusLabel =
+    campusOptions.find((c) => c.key === campus)?.label ?? "כל הקמפוסים";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadReport5() {
+      setLoading(true);
+
+      try {
+        const qs = new URLSearchParams({
+          campus,
+          year,
+        });
+
+        const res = await fetch(`${API_BASE_URL}/api/report5/media?${qs.toString()}`);
+        if (!res.ok) {
+          throw new Error("API not ready");
+        }
+
+        const json = await res.json();
+        if (!Array.isArray(json)) {
+          throw new Error("Bad API shape");
+        }
+
+        const merged = mediaSources.map((source) => {
+          const found = json.find((item) => item.name === source.key);
+          return {
+            name: source.key,
+            gross: found?.gross ?? 0,
+            qualified: found?.qualified ?? 0,
+            color: source.color,
+          };
+        });
+
+        if (!cancelled) {
+          setRaw(merged);
+          setApiMode("api");
+        }
+      } catch (error) {
+        console.error("Report5 API error:", error);
+
+        const mock = buildMockByMedia({ year, campus });
+
+        if (!cancelled) {
+          setRaw(mock);
+          setApiMode("mock");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadReport5();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campus, year]);
 
   const grossData = useMemo(() => {
     const total = raw.reduce((s, r) => s + (r.gross ?? 0), 0);
@@ -196,14 +266,15 @@ export default function Report5() {
 
   const totalGross = grossData.reduce((s, r) => s + (r.value ?? 0), 0);
   const totalQualified = qualifiedData.reduce((s, r) => s + (r.value ?? 0), 0);
-  const qualifiedRate = totalGross ? ((totalQualified / totalGross) * 100).toFixed(1) : "0.0";
+  const qualifiedRate = totalGross
+    ? ((totalQualified / totalGross) * 100).toFixed(1)
+    : "0.0";
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#2e3038] text-white">
       <Sidebar isOpen={menuOpen} onToggle={() => setMenuOpen((s) => !s)} />
 
       <div className="mx-auto max-w-6xl px-6 pt-8 pb-14">
-        {/* TOP BAR */}
         <div className="grid grid-cols-3 items-start">
           <div className="justify-self-start">
             <button
@@ -233,28 +304,33 @@ export default function Report5() {
           <div />
         </div>
 
-        {/* Title */}
         <div className="mt-6 text-center">
           <div className="inline-flex items-center justify-center gap-2">
             <IcoTitle />
-            <h1 className="text-3xl font-extrabold tracking-tight">דוח 5 – ניתוח לידים ומדיה</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight">
+              דוח 5 – ניתוח לידים ומדיה
+            </h1>
           </div>
 
           <p className="mt-2 text-sm text-white/75">
-           השוואת התפלגות לידים לפי מקור מדיה - סה״כ הלידים מול הלידים האיכותיים | שנה:{" "}
+            השוואת התפלגות לידים לפי מקור מדיה - סה״כ הלידים מול הלידים האיכותיים | שנה:{" "}
             <span className="font-semibold">{year}</span> | קמפוס:{" "}
             <span className="font-semibold">{campusLabel}</span>
+            <span className="mx-2 font-semibold">
+              {apiMode === "api" ? "API" : "MOCK"}
+            </span>
+            {loading ? <span className="mr-2">(טוען...)</span> : null}
           </p>
         </div>
 
-        {/* Quick stats */}
         <div className="mt-5 text-center text-sm text-white/80">
-          <span className="font-semibold">{qualifiedRate}%</span> יחס איכותיים • הלידים האיכותיים :{" "}
-          <span className="font-semibold">{fmtInt(totalQualified)}</span> • סה״כ הלידים :{" "}
+          <span className="font-semibold">{qualifiedRate}%</span> יחס איכותיים •
+          הלידים האיכותיים :{" "}
+          <span className="font-semibold">{fmtInt(totalQualified)}</span> •
+          סה״כ הלידים :{" "}
           <span className="font-semibold">{fmtInt(totalGross)}</span>
         </div>
 
-        {/* Filters */}
         <div className="mt-6 flex flex-col items-center justify-between gap-4 lg:flex-row">
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm text-white/80">קמפוס</div>
@@ -289,7 +365,6 @@ export default function Report5() {
           </div>
         </div>
 
-        {/* Big pies card */}
         <div className="mt-8">
           <div className="rounded-[28px] bg-[#3b3e47] p-6 lg:p-7 shadow-[0_18px_55px_rgba(0,0,0,0.35)]">
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -297,14 +372,15 @@ export default function Report5() {
                 <IcoCard />
                 <div className="text-lg font-bold">התפלגות לידים לפי מקור מדיה</div>
               </div>
-              <div className="text-xs text-white/60">2 תרשימי עוגה של לידים איכותיים מול סה״כ הלידים </div>
+              <div className="text-xs text-white/60">
+                2 תרשימי עוגה של לידים איכותיים מול סה״כ הלידים
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Qualified */}
               <div className="rounded-2xl bg-[#2e3038] p-4 ring-1 ring-white/10">
                 <div className="mb-3 text-sm font-semibold text-white/90 text-center">
-                  לידים איכותיים 
+                  לידים איכותיים
                 </div>
 
                 <div className="rounded-2xl bg-white/6 p-2 ring-1 ring-white/5">
@@ -335,10 +411,9 @@ export default function Report5() {
                 </div>
               </div>
 
-              {/* Gross */}
               <div className="rounded-2xl bg-[#2e3038] p-4 ring-1 ring-white/10">
                 <div className="mb-3 text-sm font-semibold text-white/90 text-center">
-                  סה״כ לידים 
+                  סה״כ לידים
                 </div>
 
                 <div className="rounded-2xl bg-white/6 p-2 ring-1 ring-white/5">
